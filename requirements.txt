@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+streamlit
+requests
+pillow
+numpy
+torch
+transformers
+qdrant-client
+python-dotenv

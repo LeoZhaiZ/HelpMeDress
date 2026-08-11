@@ -1,0 +1,42 @@
+[
+  {
+    "id": "item_001",
+    "name": "Black Oversized Hoodie",
+    "category": "top",
+    "style": "streetwear",
+    "brand": "Sample Brand",
+    "price": 60,
+    "image_path": "data/raw/black_hoodie.jpg",
+    "product_url": "https://example.com/black-hoodie"
+  },
+  {
+    "id": "item_002",
+    "name": "Grey Cargo Pants",
+    "category": "bottom",
+    "style": "streetwear",
+    "brand": "Sample Brand",
+    "price": 75,
+    "image_path": "data/raw/grey_cargos.jpg",
+    "product_url": "https://example.com/grey-cargos"
+  },
+  {
+    "id": "item_003",
+    "name": "White Sneakers",
+    "category": "shoes",
+    "style": "casual",
+    "brand": "Sample Brand",
+    "price": 100,
+    "image_path": "data/raw/white_sneakers.jpg",
+    "product_url": "https://example.com/white-sneakers"
+  },
+  {
+    "id": "item_004",
+    "name": "Black Cap",
+    "category": "accessory",
+    "style": "streetwear",
+    "brand": "Sample Brand",
+    "price": 30,
+    "image_path": "data/raw/black_cap.jpg",
+    "product_url": "https://example.com/black-cap"
+  }
+]
