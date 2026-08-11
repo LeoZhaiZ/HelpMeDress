@@ -6,7 +6,7 @@
     "style": "streetwear",
     "brand": "Sample Brand",
     "price": 60,
-    "image_path": "data/raw/black_hoodie.jpg",
+    "image_path": "data/raw/black-hoodie.jpg",
     "product_url": "https://example.com/black-hoodie"
   },
   {
@@ -16,7 +16,7 @@
     "style": "streetwear",
     "brand": "Sample Brand",
     "price": 75,
-    "image_path": "data/raw/grey_cargos.jpg",
+    "image_path": "data/raw/grey-cargos.jpg",
     "product_url": "https://example.com/grey-cargos"
   },
   {
@@ -26,7 +26,7 @@
     "style": "casual",
     "brand": "Sample Brand",
     "price": 100,
-    "image_path": "data/raw/white_sneakers.jpg",
+    "image_path": "data/raw/white-sneakers.jpg",
     "product_url": "https://example.com/white-sneakers"
   },
   {
@@ -36,7 +36,29 @@
     "style": "streetwear",
     "brand": "Sample Brand",
     "price": 30,
-    "image_path": "data/raw/black_cap.jpg",
+    "image_path": "data/raw/black-cap.jpg",
     "product_url": "https://example.com/black-cap"
+  }
+  ,
+  {
+    "id": "item_005",
+    "name": "White Tshirt",
+    "category": "top",
+    "style": "streetwear",
+    "brand": "Sample Brand",
+    "price": 30,
+    "image_path": "data/raw/white-tshirt.jpg",
+    "product_url": "https://example.com/white-tshirt"
+  }
+  ,
+  {
+    "id": "item_006",
+    "name": "Blue Jeans",
+    "category": "bottom",
+    "style": "streetwear",
+    "brand": "Sample Brand",
+    "price": 30,
+    "image_path": "data/raw/blue-jeans.jpg",
+    "product_url": "https://example.com/blue-jeans"
   }
 ]
