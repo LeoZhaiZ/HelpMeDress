@@ -68,12 +68,15 @@ class VectorSearchService:
                 ]
             )
 
-        results = self.client.search(
+        search_response = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=query_filter,
-            limit=top_k
+            limit=top_k,
+            with_payload=True
         )
+
+        results = search_response.points
 
         formatted_results = []
 
