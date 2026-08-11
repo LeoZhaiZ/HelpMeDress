@@ -1,6 +1,6 @@
 [
   {
-    "id": "item_001",
+    "id": 1,
     "name": "Black Oversized Hoodie",
     "category": "top",
     "style": "streetwear",
@@ -10,7 +10,7 @@
     "product_url": "https://example.com/black-hoodie"
   },
   {
-    "id": "item_002",
+    "id": 2,
     "name": "Grey Cargo Pants",
     "category": "bottom",
     "style": "streetwear",
@@ -20,7 +20,7 @@
     "product_url": "https://example.com/grey-cargos"
   },
   {
-    "id": "item_003",
+    "id": 3,
     "name": "White Sneakers",
     "category": "shoes",
     "style": "casual",
@@ -30,7 +30,7 @@
     "product_url": "https://example.com/white-sneakers"
   },
   {
-    "id": "item_004",
+    "id": 4,
     "name": "Black Cap",
     "category": "accessory",
     "style": "streetwear",
@@ -41,7 +41,7 @@
   }
   ,
   {
-    "id": "item_005",
+    "id": 5,
     "name": "White Tshirt",
     "category": "top",
     "style": "streetwear",
@@ -52,7 +52,7 @@
   }
   ,
   {
-    "id": "item_006",
+    "id": 6,
     "name": "Blue Jeans",
     "category": "bottom",
     "style": "streetwear",

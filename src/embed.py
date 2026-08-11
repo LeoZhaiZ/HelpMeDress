@@ -32,8 +32,12 @@ class EmbeddingService:
             return_tensors="pt"
         ).to(self.device)
 
-        with torch.no_grad():
-            image_features = self.model.get_image_features(**inputs)
+        with torch.inference_mode():
+            image_output = self.model.get_image_features(**inputs)
+
+            # Newer versions of Hugging Face Transformers return
+            # a BaseModelOutputWithPooling instead of the tensor directly.
+        image_features = image_output.pooler_output
 
         embedding = image_features.cpu().numpy()[0]
 
