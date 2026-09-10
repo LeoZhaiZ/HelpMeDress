@@ -3,6 +3,8 @@ import torch
 import numpy as np
 from transformers import CLIPProcessor, CLIPModel
 
+from src.config import CLIP_MODEL_NAME, EMBEDDING_SIZE
+
 
 class EmbeddingService:
     """
@@ -13,7 +15,7 @@ class EmbeddingService:
     """
 
     def __init__(self):
-        self.model_name = "openai/clip-vit-base-patch32"
+        self.model_name = CLIP_MODEL_NAME
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         print(f"Loading CLIP model on {self.device}...")
@@ -52,4 +54,4 @@ class EmbeddingService:
         return embedding.tolist()
 
     def get_embedding_size(self) -> int:
-        return 512
+        return EMBEDDING_SIZE
