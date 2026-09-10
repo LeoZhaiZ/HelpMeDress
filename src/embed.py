@@ -25,15 +25,22 @@ class EmbeddingService:
 
         self.model.eval()
 
-    def embed_image(self, image: Image.Image) -> list[float]:
-        if image.mode != "RGB":
-            image = image.convert("RGB")
+    def embed_images(self, images: list[Image.Image]) -> list[list[float]]:
+        """Create one normalized embedding for each image in a batch."""
+        if not images:
+            raise ValueError("At least one image is required for embedding.")
+
+        # CLIP expects three-channel RGB images. Converting the whole list here
+        # also makes uploads with grayscale or transparent pixels safe to use.
+        rgb_images = [image.convert("RGB") for image in images]
 
         inputs = self.processor(
-            images=image,
+            images=rgb_images,
             return_tensors="pt"
         ).to(self.device)
 
+        # Passing the complete batch through CLIP at once is much faster than
+        # running the model separately for every catalog image.
         with torch.inference_mode():
             image_output = self.model.get_image_features(**inputs)
 
@@ -41,17 +48,22 @@ class EmbeddingService:
             # a BaseModelOutputWithPooling instead of the tensor directly.
         image_features = image_output.pooler_output
 
-        embedding = image_features.cpu().numpy()[0]
+        embeddings = image_features.cpu().numpy()
 
-        # Normalize vector so cosine similarity works properly.
-        norm = np.linalg.norm(embedding)
+        # Normalize every vector independently so cosine similarity works
+        # properly for each image in the batch.
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
 
-        if norm == 0:
+        if np.any(norms == 0):
             raise ValueError("Embedding norm is zero.")
 
-        embedding = embedding / norm
+        normalized_embeddings = embeddings / norms
 
-        return embedding.tolist()
+        return normalized_embeddings.tolist()
+
+    def embed_image(self, image: Image.Image) -> list[float]:
+        """Create one normalized embedding for a single image."""
+        return self.embed_images([image])[0]
 
     def get_embedding_size(self) -> int:
         return EMBEDDING_SIZE
