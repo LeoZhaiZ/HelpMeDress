@@ -8,6 +8,12 @@ from qdrant_client.models import (
     MatchValue
 )
 
+from src.config import (
+    QDRANT_COLLECTION_NAME,
+    QDRANT_HOST,
+    QDRANT_PORT
+)
+
 
 class VectorSearchService:
     """
@@ -18,8 +24,8 @@ class VectorSearchService:
     """
 
     def __init__(self):
-        self.collection_name = "helpmedress_items"
-        self.client = QdrantClient(host="localhost", port=6333)
+        self.collection_name = QDRANT_COLLECTION_NAME
+        self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
     def create_collection_if_needed(self, vector_size: int):
         collections = self.client.get_collections().collections
