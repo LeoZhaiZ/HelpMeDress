@@ -73,6 +73,15 @@ class VectorSearchService:
             points=points
         )
 
+    def count_points(self) -> int:
+        """Return the exact number of points stored in the collection."""
+        count_result = self.client.count(
+            collection_name=self.collection_name,
+            exact=True
+        )
+
+        return count_result.count
+
     def search_similar(
         self,
         query_vector: list[float],
