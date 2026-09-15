@@ -44,6 +44,16 @@ class VectorSearchService:
         else:
             print(f"Qdrant collection already exists: {self.collection_name}")
 
+    def delete_collection_if_exists(self):
+        """Delete the current collection so it can be rebuilt from scratch."""
+        if self.client.collection_exists(self.collection_name):
+            print(f"Deleting Qdrant collection: {self.collection_name}")
+            self.client.delete_collection(
+                collection_name=self.collection_name
+            )
+        else:
+            print(f"Qdrant collection does not exist: {self.collection_name}")
+
     def upsert_item(self, item: dict, embedding: list[float]):
         point = PointStruct(
             id=item["id"],
@@ -51,9 +61,16 @@ class VectorSearchService:
             payload=item
         )
 
+        self.upsert_points([point])
+
+    def upsert_points(self, points: list[PointStruct]):
+        """Insert or update several Qdrant points in one request."""
+        if not points:
+            return
+
         self.client.upsert(
             collection_name=self.collection_name,
-            points=[point]
+            points=points
         )
 
     def search_similar(
