@@ -33,6 +33,17 @@ def health():
     }
 
 
+@app.get("/items/count")
+def get_item_count():
+    try:
+        return {
+            "collection": search_service.collection_name,
+            "count": search_service.count_points()
+        }
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
+
+
 @app.post("/search/similar")
 async def search_similar(
     file: UploadFile = File(...),
