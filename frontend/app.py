@@ -15,6 +15,37 @@ st.set_page_config(
 st.title("HelpMeDress")
 st.write("Upload a clothing image to find similar items and generate outfit recommendations.")
 
+with st.sidebar:
+    st.subheader("API Status")
+
+    try:
+        health_response = requests.get(
+            f"{API_BASE_URL}/health",
+            timeout=3
+        )
+
+        if health_response.status_code == 200:
+            st.success("Backend connected")
+
+            try:
+                count_response = requests.get(
+                    f"{API_BASE_URL}/items/count",
+                    timeout=3
+                )
+
+                if count_response.status_code == 200:
+                    count_data = count_response.json()
+                    st.metric("Indexed items", count_data["count"])
+                    st.caption(f"Collection: {count_data['collection']}")
+                else:
+                    st.warning("Indexed item count is unavailable.")
+            except (requests.RequestException, ValueError, KeyError):
+                st.warning("Indexed item count is unavailable.")
+        else:
+            st.error("Backend is unavailable.")
+    except requests.RequestException:
+        st.error("Backend is unavailable.")
+
 uploaded_file = st.file_uploader(
     "Upload a clothing image",
     type=["jpg", "jpeg", "png"]
