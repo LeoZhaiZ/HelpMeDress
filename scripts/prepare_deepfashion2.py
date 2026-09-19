@@ -10,8 +10,8 @@ from PIL import Image
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# DeepFashion2 category IDs 10-13 are dresses. HelpMeDress does not have a
-# dress category yet, so they are reported and skipped instead of mislabeled.
+# Map DeepFashion2's detailed categories into the broader categories used by
+# HelpMeDress while preserving the original category in the metadata.
 CATEGORY_MAP = {
     1: "top",        # short sleeve top
     2: "top",        # long sleeve top
@@ -21,7 +21,11 @@ CATEGORY_MAP = {
     6: "top",        # sling
     7: "bottom",     # shorts
     8: "bottom",     # trousers
-    9: "bottom"      # skirt
+    9: "bottom",     # skirt
+    10: "dress",     # short sleeve dress
+    11: "dress",     # long sleeve dress
+    12: "dress",     # vest dress
+    13: "dress"      # sling dress
 }
 
 
@@ -308,7 +312,7 @@ def main() -> int:
     print("\nDeepFashion2 preparation complete.")
     print(f"Annotations attempted: {total_annotations}")
     print(f"Garment crops created: {totals['crops_created']}")
-    print(f"Unsupported dress items skipped: {totals['unsupported_categories']}")
+    print(f"Unsupported category items skipped: {totals['unsupported_categories']}")
     print(f"Invalid item annotations skipped: {totals['invalid_items']}")
     print(f"Annotation files skipped: {totals['annotation_errors']}")
     print(

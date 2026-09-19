@@ -32,7 +32,8 @@ SUPPORTED_CATEGORIES = {
     "bottom",
     "shoes",
     "accessory",
-    "outerwear"
+    "outerwear",
+    "dress"
 }
 
 

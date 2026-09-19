@@ -60,7 +60,7 @@ top_k = st.slider(
 
 category_filter = st.selectbox(
     "Optional category filter",
-    options=["", "top", "bottom", "shoes", "accessory", "outerwear"]
+    options=["", "top", "bottom", "shoes", "accessory", "outerwear", "dress"]
 )
 
 if uploaded_file is not None:
@@ -120,7 +120,7 @@ if uploaded_file is not None:
 
     anchor_category = st.selectbox(
         "What type of item did you upload?",
-        options=["top", "bottom", "shoes", "accessory", "outerwear"]
+        options=["top", "bottom", "shoes", "accessory", "outerwear", "dress"]
     )
 
     if st.button("Generate Outfit"):

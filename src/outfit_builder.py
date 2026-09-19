@@ -22,4 +22,7 @@ class OutfitBuilder:
         if anchor_category == "accessory":
             return ["top", "bottom", "shoes"]
 
+        if anchor_category == "dress":
+            return ["outerwear", "shoes", "accessory"]
+
         return ["top", "bottom", "shoes"]
