@@ -6,6 +6,53 @@ from PIL import Image
 API_BASE_URL = "http://127.0.0.1:8000"
 
 
+def display_item_card(item: dict):
+    """Display one result while safely handling optional metadata."""
+    image_path = item.get("image_path")
+    if image_path:
+        st.image(image_path, use_container_width=True)
+    else:
+        st.warning("Image unavailable")
+
+    st.markdown(f"**{item.get('name') or 'Unnamed item'}**")
+
+    category = item.get("category")
+    if category:
+        st.write(f"Category: {category}")
+
+    source_category = item.get("source_category")
+    if source_category:
+        readable_category = str(source_category).replace("_", " ").title()
+        st.write(f"Dataset category: {readable_category}")
+
+    source_domain = item.get("source_domain")
+    if source_domain:
+        st.write(f"Dataset source: {str(source_domain).title()}")
+
+    style = item.get("style")
+    if style not in (None, ""):
+        st.write(f"Style: {style}")
+
+    brand = item.get("brand")
+    if brand not in (None, ""):
+        st.write(f"Brand: {brand}")
+
+    price = item.get("price")
+    if price is not None:
+        st.write(f"Price: ${price}")
+
+    similarity_score = item.get("similarity_score")
+    if isinstance(similarity_score, (int, float)):
+        st.write(f"Similarity: {similarity_score:.3f}")
+
+    product_url = item.get("product_url")
+    if (
+        isinstance(product_url, str)
+        and product_url.startswith(("http://", "https://"))
+    ):
+        st.link_button("View Product", product_url)
+
+
 st.set_page_config(
     page_title="HelpMeDress",
     page_icon="👕",
@@ -105,14 +152,7 @@ if uploaded_file is not None:
 
                 for index, item in enumerate(results):
                     with cols[index % 3]:
-                        st.image(item["image_path"], use_container_width=True)
-                        st.markdown(f"**{item['name']}**")
-                        st.write(f"Category: {item['category']}")
-                        st.write(f"Style: {item['style']}")
-                        st.write(f"Brand: {item['brand']}")
-                        st.write(f"Price: ${item['price']}")
-                        st.write(f"Similarity: {item['similarity_score']:.3f}")
-                        st.link_button("View Product", item["product_url"])
+                        display_item_card(item)
 
     st.divider()
 
@@ -160,10 +200,4 @@ if uploaded_file is not None:
 
                 for index, item in enumerate(items):
                     with cols[index % 3]:
-                        st.image(item["image_path"], use_container_width=True)
-                        st.markdown(f"**{item['name']}**")
-                        st.write(f"Category: {item['category']}")
-                        st.write(f"Style: {item['style']}")
-                        st.write(f"Price: ${item['price']}")
-                        st.write(f"Similarity: {item['similarity_score']:.3f}")
-                        st.link_button("View Product", item["product_url"])
+                        display_item_card(item)
