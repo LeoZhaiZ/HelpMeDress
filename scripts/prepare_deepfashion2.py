@@ -47,10 +47,16 @@ def parse_args():
         help="Dataset split to prepare (default: validation)."
     )
     parser.add_argument(
+        "--source",
+        choices=["all", "user", "shop"],
+        default="all",
+        help="Only prepare user or shop images (default: all)."
+    )
+    parser.add_argument(
         "--output",
         help=(
             "Output metadata JSON path. Defaults to "
-            "data/processed/deepfashion2_<split>_metadata.json."
+            "data/processed/deepfashion2_<split>[_<source>]_metadata.json."
         )
     )
     parser.add_argument(
@@ -99,6 +105,37 @@ def item_annotations(annotation: dict) -> list[tuple[str, dict]]:
             items.append((key, value))
 
     return sorted(items, key=lambda item: int(item[0][4:]))
+
+
+def select_annotation_paths(
+    annotations_dir: Path,
+    source: str,
+    limit: int | None
+) -> list[Path]:
+    """Select annotation files, optionally filtering by user or shop source."""
+    annotation_paths = sorted(annotations_dir.glob("*.json"))
+
+    if source == "all":
+        return annotation_paths if limit is None else annotation_paths[:limit]
+
+    selected_paths = []
+    if limit == 0:
+        return selected_paths
+
+    for annotation_path in annotation_paths:
+        try:
+            with annotation_path.open("r", encoding="utf-8") as file:
+                annotation = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        if isinstance(annotation, dict) and annotation.get("source") == source:
+            selected_paths.append(annotation_path)
+
+            if limit is not None and len(selected_paths) >= limit:
+                break
+
+    return selected_paths
 
 
 def crop_box(
@@ -263,18 +300,22 @@ def main() -> int:
         print(f"- {annotations_dir}")
         return 1
 
-    output_path = resolve_from_project(
-        args.output
-        or f"data/processed/deepfashion2_{args.split}_metadata.json"
+    source_suffix = "" if args.source == "all" else f"_{args.source}"
+    default_output = (
+        f"data/processed/deepfashion2_{args.split}"
+        f"{source_suffix}_metadata.json"
     )
+    output_path = resolve_from_project(args.output or default_output)
     crops_dir = resolve_from_project(
         args.crops_dir
         or f"data/processed/deepfashion2_crops/{args.split}"
     )
 
-    annotation_paths = sorted(annotations_dir.glob("*.json"))
-    if args.limit is not None:
-        annotation_paths = annotation_paths[:args.limit]
+    annotation_paths = select_annotation_paths(
+        annotations_dir=annotations_dir,
+        source=args.source,
+        limit=args.limit
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     crops_dir.mkdir(parents=True, exist_ok=True)
@@ -310,6 +351,7 @@ def main() -> int:
         file.write("\n")
 
     print("\nDeepFashion2 preparation complete.")
+    print(f"Source filter: {args.source}")
     print(f"Annotations attempted: {total_annotations}")
     print(f"Garment crops created: {totals['crops_created']}")
     print(f"Unsupported category items skipped: {totals['unsupported_categories']}")
