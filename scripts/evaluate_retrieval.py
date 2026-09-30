@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +56,17 @@ def parse_args():
         default="data/processed/retrieval_evaluation.json",
         help="Path for the measured evaluation results."
     )
+    parser.add_argument(
+        "--grids-dir",
+        default="data/processed/retrieval_grids",
+        help="Directory for nearest-neighbor image grids."
+    )
+    parser.add_argument(
+        "--grid-count",
+        type=int,
+        default=20,
+        help="Number of diagnostic grids to save (default: 20)."
+    )
 
     args = parser.parse_args()
 
@@ -65,6 +76,8 @@ def parse_args():
         parser.error("--gallery-limit must be greater than zero.")
     if args.batch_size <= 0:
         parser.error("--batch-size must be greater than zero.")
+    if args.grid_count < 0:
+        parser.error("--grid-count cannot be negative.")
 
     return args
 
@@ -234,11 +247,12 @@ def calculate_recall(
     query_embeddings: np.ndarray,
     gallery: list[dict],
     gallery_embeddings: np.ndarray
-) -> tuple[dict[int, float], dict[int, int]]:
+) -> tuple[dict[int, float], dict[int, int], list[dict]]:
     """Compare each query with every gallery vector and calculate Recall@K."""
     recall_levels = (1, 5, 10)
     hit_counts = {level: 0 for level in recall_levels}
     evaluated_queries = 0
+    query_results = []
 
     gallery_identities = [garment_identity(item) for item in gallery]
     available_identities = set(gallery_identities)
@@ -253,6 +267,15 @@ def calculate_recall(
         similarity_scores = gallery_embeddings @ query_embedding
         ranked_indices = np.argsort(-similarity_scores)
 
+        first_correct_rank = next(
+            (
+                rank
+                for rank, gallery_index in enumerate(ranked_indices, start=1)
+                if gallery_identities[gallery_index] == correct_identity
+            ),
+            None
+        )
+
         for level in recall_levels:
             top_indices = ranked_indices[:level]
             if any(
@@ -261,6 +284,30 @@ def calculate_recall(
             ):
                 hit_counts[level] += 1
 
+        top_results = []
+        for rank, gallery_index in enumerate(ranked_indices[:10], start=1):
+            gallery_item = gallery[gallery_index]
+            top_results.append({
+                "rank": rank,
+                "similarity_score": float(similarity_scores[gallery_index]),
+                "is_correct": (
+                    gallery_identities[gallery_index] == correct_identity
+                ),
+                "gallery_image_id": gallery_item.get("gallery_image_id"),
+                "bbox": gallery_item.get("bbox"),
+                "pair_id": gallery_item.get("pair_id"),
+                "style": gallery_item.get("style")
+            })
+
+        query_results.append({
+            "query_image_id": query.get("query_image_id"),
+            "bbox": query.get("bbox"),
+            "pair_id": query.get("pair_id"),
+            "style": query.get("style"),
+            "category_id": query.get("cls"),
+            "first_correct_rank": first_correct_rank,
+            "top_results": top_results
+        })
         evaluated_queries += 1
 
     if evaluated_queries == 0:
@@ -270,7 +317,130 @@ def calculate_recall(
         level: hit_counts[level] / evaluated_queries
         for level in recall_levels
     }
-    return recall, hit_counts
+    return recall, hit_counts, query_results
+
+
+def draw_crop(
+    canvas: Image.Image,
+    crop: Image.Image,
+    column: int,
+    border_color: str,
+    title: str,
+    detail: str
+):
+    """Draw one labeled garment crop in a diagnostic grid."""
+    cell_width = 170
+    image_size = 150
+    left = column * cell_width + 10
+    top = 28
+
+    crop = crop.copy()
+    crop.thumbnail((image_size, image_size))
+    image_left = left + (image_size - crop.width) // 2
+    image_top = top + (image_size - crop.height) // 2
+    canvas.paste(crop, (image_left, image_top))
+
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle(
+        (left, top, left + image_size, top + image_size),
+        outline=border_color,
+        width=4
+    )
+    font = ImageFont.load_default()
+    draw.text((left, 8), title, fill="black", font=font)
+    draw.text((left, top + image_size + 8), detail, fill="black", font=font)
+
+
+def save_retrieval_grid(
+    query_result: dict,
+    images_dir: Path,
+    output_path: Path
+):
+    """Save one query beside its ten highest-ranked shop results."""
+    top_results = query_result["top_results"]
+    canvas = Image.new(
+        "RGB",
+        ((len(top_results) + 1) * 170, 215),
+        color="white"
+    )
+
+    query_crop = load_garment_crop(
+        query_result,
+        image_id_field="query_image_id",
+        images_dir=images_dir
+    )
+    correct_rank = query_result["first_correct_rank"]
+    rank_text = str(correct_rank) if correct_rank is not None else "not found"
+    draw_crop(
+        canvas=canvas,
+        crop=query_crop,
+        column=0,
+        border_color="blue",
+        title="QUERY",
+        detail=f"Correct rank: {rank_text}"
+    )
+
+    for column, result in enumerate(top_results, start=1):
+        result_crop = load_garment_crop(
+            result,
+            image_id_field="gallery_image_id",
+            images_dir=images_dir
+        )
+        border_color = "green" if result["is_correct"] else "red"
+        match_text = "MATCH" if result["is_correct"] else "wrong"
+        draw_crop(
+            canvas=canvas,
+            crop=result_crop,
+            column=column,
+            border_color=border_color,
+            title=f"RANK {result['rank']}",
+            detail=(
+                f"{match_text}  score={result['similarity_score']:.3f}"
+            )
+        )
+
+    canvas.save(output_path, format="JPEG", quality=92)
+
+
+def save_diagnostic_grids(
+    query_results: list[dict],
+    images_dir: Path,
+    grids_dir: Path,
+    grid_count: int
+) -> int:
+    """Save failures first so the grids are useful for error analysis."""
+    if grid_count == 0:
+        return 0
+
+    def priority(result: dict) -> tuple[int, int]:
+        rank = result["first_correct_rank"]
+        if rank is None:
+            return 0, 0
+        if rank > 10:
+            return 0, rank
+        if rank > 1:
+            return 1, rank
+        return 2, rank
+
+    grids_dir.mkdir(parents=True, exist_ok=True)
+    selected_results = sorted(query_results, key=priority)[:grid_count]
+    saved_count = 0
+
+    for index, query_result in enumerate(selected_results, start=1):
+        image_id = int(query_result["query_image_id"])
+        correct_rank = query_result["first_correct_rank"]
+        rank_label = correct_rank if correct_rank is not None else "not_found"
+        output_path = grids_dir / (
+            f"{index:03d}_query_{image_id:06d}_rank_{rank_label}.jpg"
+        )
+
+        try:
+            save_retrieval_grid(query_result, images_dir, output_path)
+            saved_count += 1
+        except (KeyError, OSError, TypeError, ValueError) as error:
+            print(f"Skipping diagnostic grid for query {image_id}: {error}")
+
+    return saved_count
 
 
 def main() -> int:
@@ -278,6 +448,7 @@ def main() -> int:
     dataset_root = resolve_from_project(args.dataset_root)
     evaluation_dir = resolve_from_project(args.evaluation_dir)
     output_path = resolve_from_project(args.output)
+    grids_dir = resolve_from_project(args.grids_dir)
     images_dir = dataset_root / "validation" / "image"
 
     queries = load_json_list(evaluation_dir / "val_query.json")
@@ -310,18 +481,19 @@ def main() -> int:
         label="queries"
     )
 
-    recall, hit_counts = calculate_recall(
+    recall, hit_counts, query_results = calculate_recall(
         queries=query_items,
         query_embeddings=query_embeddings,
         gallery=gallery_items,
         gallery_embeddings=gallery_embeddings
     )
 
-    evaluated_query_count = sum(
-        garment_identity(query) in {
-            garment_identity(item) for item in gallery_items
-        }
-        for query in query_items
+    evaluated_query_count = len(query_results)
+    saved_grid_count = save_diagnostic_grids(
+        query_results=query_results,
+        images_dir=images_dir,
+        grids_dir=grids_dir,
+        grid_count=args.grid_count
     )
 
     results = {
@@ -332,7 +504,8 @@ def main() -> int:
         "skipped_gallery_items": skipped_gallery,
         "recall_at_1": recall[1],
         "recall_at_5": recall[5],
-        "recall_at_10": recall[10]
+        "recall_at_10": recall[10],
+        "queries": query_results
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -350,6 +523,9 @@ def main() -> int:
             f"{evaluated_query_count} ({percentage:.2f}%)"
         )
     print(f"Results written to: {output_path}")
+    print(f"Diagnostic grids saved: {saved_grid_count}")
+    if saved_grid_count:
+        print(f"Diagnostic grids directory: {grids_dir}")
 
     return 0
 
