@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.prepare_deepfashion2 import crop_box
+from scripts.prepare_deepfashion2 import crop_box, item_annotations
 from src.config import CLIP_MODEL_NAME
 from src.embed import EmbeddingService
 
@@ -52,13 +52,16 @@ def parse_args():
         help="Number of garment crops embedded together (default: 32)."
     )
     parser.add_argument(
+        "--category-filter",
+        action="store_true",
+        help="Compare each query only with gallery items in its category."
+    )
+    parser.add_argument(
         "--output",
-        default="data/processed/retrieval_evaluation.json",
         help="Path for the measured evaluation results."
     )
     parser.add_argument(
         "--grids-dir",
-        default="data/processed/retrieval_grids",
         help="Directory for nearest-neighbor image grids."
     )
     parser.add_argument(
@@ -174,6 +177,51 @@ def select_evaluation_subset(
     return selected_queries, selected_gallery
 
 
+def add_gallery_categories(
+    gallery: list[dict],
+    annotations_dir: Path
+) -> tuple[list[dict], int]:
+    """Add category IDs by matching gallery boxes to raw annotations."""
+    categorized_gallery = []
+    missing_category_count = 0
+    annotation_cache = {}
+
+    for gallery_item in gallery:
+        image_id = int(gallery_item["gallery_image_id"])
+
+        if image_id not in annotation_cache:
+            annotation_path = annotations_dir / f"{image_id:06d}.json"
+            try:
+                with annotation_path.open("r", encoding="utf-8") as file:
+                    annotation_cache[image_id] = json.load(file)
+            except (OSError, json.JSONDecodeError):
+                annotation_cache[image_id] = None
+
+        annotation = annotation_cache[image_id]
+        category_id = None
+
+        if isinstance(annotation, dict):
+            expected_box = gallery_item.get("bbox")
+            expected_style = gallery_item.get("style")
+
+            for _, garment in item_annotations(annotation):
+                if (
+                    garment.get("bounding_box") == expected_box
+                    and garment.get("style") == expected_style
+                ):
+                    category_id = garment.get("category_id")
+                    break
+
+        categorized_item = dict(gallery_item)
+        categorized_item["category_id"] = category_id
+        categorized_gallery.append(categorized_item)
+
+        if category_id is None:
+            missing_category_count += 1
+
+    return categorized_gallery, missing_category_count
+
+
 def load_garment_crop(
     item: dict,
     image_id_field: str,
@@ -246,7 +294,8 @@ def calculate_recall(
     queries: list[dict],
     query_embeddings: np.ndarray,
     gallery: list[dict],
-    gallery_embeddings: np.ndarray
+    gallery_embeddings: np.ndarray,
+    category_filter: bool = False
 ) -> tuple[dict[int, float], dict[int, int], list[dict]]:
     """Compare each query with every gallery vector and calculate Recall@K."""
     recall_levels = (1, 5, 10)
@@ -255,17 +304,36 @@ def calculate_recall(
     query_results = []
 
     gallery_identities = [garment_identity(item) for item in gallery]
-    available_identities = set(gallery_identities)
-
     for query, query_embedding in zip(queries, query_embeddings):
         correct_identity = garment_identity(query)
-        if correct_identity not in available_identities:
+        query_category = query.get("cls")
+
+        if category_filter:
+            candidate_indices = np.asarray(
+                [
+                    index
+                    for index, gallery_item in enumerate(gallery)
+                    if gallery_item.get("category_id") == query_category
+                ],
+                dtype=np.int64
+            )
+        else:
+            candidate_indices = np.arange(len(gallery), dtype=np.int64)
+
+        if not any(
+            gallery_identities[index] == correct_identity
+            for index in candidate_indices
+        ):
             continue
 
         # The vectors are normalized, so their dot product is cosine
-        # similarity. Every gallery vector is compared with this query.
+        # similarity. Every eligible gallery vector is compared with this query.
+        candidate_scores = (
+            gallery_embeddings[candidate_indices] @ query_embedding
+        )
+        ranked_indices = candidate_indices[np.argsort(-candidate_scores)]
+
         similarity_scores = gallery_embeddings @ query_embedding
-        ranked_indices = np.argsort(-similarity_scores)
 
         first_correct_rank = next(
             (
@@ -296,7 +364,8 @@ def calculate_recall(
                 "gallery_image_id": gallery_item.get("gallery_image_id"),
                 "bbox": gallery_item.get("bbox"),
                 "pair_id": gallery_item.get("pair_id"),
-                "style": gallery_item.get("style")
+                "style": gallery_item.get("style"),
+                "category_id": gallery_item.get("category_id")
             })
 
         query_results.append({
@@ -447,9 +516,17 @@ def main() -> int:
     args = parse_args()
     dataset_root = resolve_from_project(args.dataset_root)
     evaluation_dir = resolve_from_project(args.evaluation_dir)
-    output_path = resolve_from_project(args.output)
-    grids_dir = resolve_from_project(args.grids_dir)
+    result_suffix = "_category_filtered" if args.category_filter else ""
+    output_path = resolve_from_project(
+        args.output
+        or f"data/processed/retrieval_evaluation{result_suffix}.json"
+    )
+    grids_dir = resolve_from_project(
+        args.grids_dir
+        or f"data/processed/retrieval_grids{result_suffix}"
+    )
     images_dir = dataset_root / "validation" / "image"
+    annotations_dir = dataset_root / "validation" / "annos"
 
     queries = load_json_list(evaluation_dir / "val_query.json")
     gallery = load_json_list(evaluation_dir / "val_gallery.json")
@@ -459,6 +536,13 @@ def main() -> int:
         query_limit=args.query_limit,
         gallery_limit=args.gallery_limit
     )
+
+    missing_gallery_categories = 0
+    if args.category_filter:
+        selected_gallery, missing_gallery_categories = add_gallery_categories(
+            gallery=selected_gallery,
+            annotations_dir=annotations_dir
+        )
 
     print(f"Selected queries: {len(selected_queries)}")
     print(f"Selected gallery items: {len(selected_gallery)}")
@@ -485,7 +569,8 @@ def main() -> int:
         queries=query_items,
         query_embeddings=query_embeddings,
         gallery=gallery_items,
-        gallery_embeddings=gallery_embeddings
+        gallery_embeddings=gallery_embeddings,
+        category_filter=args.category_filter
     )
 
     evaluated_query_count = len(query_results)
@@ -502,6 +587,8 @@ def main() -> int:
         "gallery_count": len(gallery_items),
         "skipped_queries": skipped_queries,
         "skipped_gallery_items": skipped_gallery,
+        "missing_gallery_categories": missing_gallery_categories,
+        "category_filter": args.category_filter,
         "recall_at_1": recall[1],
         "recall_at_5": recall[5],
         "recall_at_10": recall[10],
@@ -514,6 +601,7 @@ def main() -> int:
         file.write("\n")
 
     print("\nZero-shot CLIP retrieval evaluation")
+    print(f"Category filter: {'on' if args.category_filter else 'off'}")
     print(f"Queries evaluated: {evaluated_query_count}")
     print(f"Gallery items: {len(gallery_items)}")
     for level in (1, 5, 10):
