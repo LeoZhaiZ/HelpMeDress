@@ -222,3 +222,5 @@ of failures. The category filter helped, but the 26% Recall@1 also showed that
 general-purpose CLIP still has trouble recognizing the exact same garment.
 
 This is all i have done for now :salute: its gna be updated the more i work on it. also i think training stats are going to be put here too
+
+
