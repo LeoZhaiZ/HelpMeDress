@@ -224,3 +224,14 @@ general-purpose CLIP still has trouble recognizing the exact same garment.
 This is all i have done for now :salute: its gna be updated the more i work on it. also i think training stats are going to be put here too
 
 
+September 30
+i added the script that builds the training triplets before downloading
+train.zip. it takes a user pic, finds the matching shop pic, then finds a
+different shop item from the same clothing category to use as the negative. i
+also made the random choices repeatable and tested it with fake metadata so i
+know the matching logic works before throwing the full dataset at it.
+
+when train.zip is downloaded i just need to prepare it with `--source all` and
+run `python scripts/build_training_triplets.py`. still havent trained the model
+yet though, this just gets the examples ready so i can look at them before the
+training loop uses them.
