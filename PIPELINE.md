@@ -205,10 +205,16 @@ DeepFashion2 category. It is separate from the broader `top`, `bottom`,
 
 These are the results measured on the same 100-query/1,000-gallery subset:
 
-| Evaluation | Recall@1 | Recall@5 | Recall@10 |
-| --- | ---: | ---: | ---: |
-| All categories | 17% | 28% | 39% |
-| Same detailed category only | 26% | 62% | 79% |
+# ALL TRAININGS AND STUFF
+First training:
+  All categories:
+    Recall@1: 17%
+    Recall@5: 28%
+    Recall@10: 39%
+  Same detailed category only:
+    Recall@1: 26%
+    Recall@5: 62%
+    Recall@10: 79%
 
 Recall@5 means that at least one correct shop match appeared in the first five
 results. The jump from 28% to 62% showed that category confusion caused a lot
