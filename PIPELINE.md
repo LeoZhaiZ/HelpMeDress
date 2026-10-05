@@ -235,3 +235,16 @@ when train.zip is downloaded i just need to prepare it with `--source all` and
 run `python scripts/build_training_triplets.py`. still havent trained the model
 yet though, this just gets the examples ready so i can look at them before the
 training loop uses them.
+
+
+
+October 4
+i added the pytorch dataset loader for the triplets. basically the json file
+tells it which 3 image paths belong together, then the loader actually opens
+the anchor, positive, and negative and turns all of them into RGB. i made it
+keep the ids too so if one training example looks wrong i can trace it back
+instead of having no clue where it came from.
+
+i tested it with fake grayscale, transparent, and normal images and they all
+came out as RGB like theyre supposed to. this still isnt the training loop yet,
+its just the bridge between the triplet json and whatever model i train next.
