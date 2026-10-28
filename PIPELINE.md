@@ -269,9 +269,43 @@ $$
 
 where $I$ is an image and $\mathbf{e}\in\mathbb{R}^{512}$ is its embedding. The weights $\theta$ determine how visual input turns into a vector.
 
-For the ViT-B/32 image encoder, the image is preprocessed and split into patches (32 by 32 pixels at the usual 224 by 224 input size). Patches are projected into tokens, processed by transformer blocks, and mapped into CLIP's shared embedding space. One key transformer operation is scaled dot-product attention:
+For the ViT-B/32 image encoder (means Viual Transformer), the image is preprocessed and split into patches (32 by 32 pixels at the usual 224 by 224 input size). Patches are projected into tokens, processed by transformer blocks, and mapped into CLIP's shared embedding space. One key transformer operation is scaled dot-product attention:
 
 $$
 \operatorname{Attention}(Q,K,V)
 =\operatorname{softmax}\!\left(\frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V.
 $$
+
+Tensors in pyTorch: A tensor is basically a collection of numbers with a shape. A scalar has no axes, a vector has one, and a matrix has two. Image batches usually have more. For a batch of 32 RGB images, the CLIP-ready tensor commonly has shape:
+$$
+(32,3,224,224)
+$$
+That represents 32 images, 3 colour channels, and 224-by-224 pixels. After CLIP, the embedding batch is typically shaped:
+$$
+(32,512)
+$$ 
+This is why batching is useful. Instead of asking CLIP to process one image at a time, scripts/batch_ingest.py can process multiple crops together.
+
+How PyTorch compares the embeddings to find how similar they are:
+An embedding is a vector, and I want to compare the direction of vectors rather than letting a longer vector automatically dominate.
+
+# L2 normalization
+
+Pytorch divides each embedding by its length:
+
+$$
+\hat{\mathbf e}=\frac{\mathbf e}{\lVert\mathbf e\rVert_2}
+$$
+
+and then calculates it using:
+
+$$
+\lVert\mathbf e\rVert_2=\sqrt{\sum_{j=1}^{512}e_j^2}
+$$
+
+and in PyTorch, it would be coded as:
+
+```python
+import torch.nn.functional as F
+normalized = F.normalize(features, p=2, dim=-1)
+```
