@@ -309,3 +309,26 @@ and in PyTorch, it would be coded as:
 import torch.nn.functional as F
 normalized = F.normalize(features, p=2, dim=-1)
 ```
+
+# Cosine similarity
+
+Finally, to compare multiple normalized embeddings, PyTorch compares the distance (angle) of the two vectors using. cosine similarity using this function:
+$$
+\operatorname{sim}(\mathbf a,\mathbf b)=
+\frac{\mathbf a\cdot\mathbf b}{\lVert\mathbf a\rVert_2\lVert\mathbf b\rVert_2}
+$$
+This function already accounts for length, but normalizing the vectors make the calculation faster during comparisons and would turn it into a simple dot product: 
+$$
+\operatorname{sim}(\hat{\mathbf a},\hat{\mathbf b})=
+\hat{\mathbf a}^{T}\hat{\mathbf b}
+$$
+For an entire gallery, I can calculate all the query-to-gallery scores at once:
+$$
+\mathbf s=G\mathbf q
+$$
+Here `G` contains one normalized shop vector per row, `q` is the normalized query vector, and `s` contains a similarity score for every shop item.
+
+```python
+scores = gallery_embeddings @ query_embedding
+best_scores, best_indices = torch.topk(scores, k=5)
+```
