@@ -332,3 +332,56 @@ Here `G` contains one normalized shop vector per row, `q` is the normalized quer
 scores = gallery_embeddings @ query_embedding
 best_scores, best_indices = torch.topk(scores, k=5)
 ```
+
+# How Recall@K works here
+
+DeepFashion2 supplies the answer through its labels. In the evaluation I've described, a query and shop garment match when their `pair_id` and `style` identify the same garment. The script compares the ranked results with those known labels.
+
+I can define the correct shop matches for a query as:
+$$
+M(q)=\{g:\operatorname{pair\_id}(g)=\operatorname{pair\_id}(q)
+\ \land\ \operatorname{style}(g)=\operatorname{style}(q)\}
+$$
+Then I check whether at least one correct match is present in the first K results:
+
+$$
+h_K(q)=\begin{cases}
+1 & \text{if a correct match appears in the top K}\\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+Across all evaluated queries:
+
+$$
+\operatorname{Recall@K}=\frac{1}{N}\sum_{i=1}^{N}h_K(q_i)
+$$
+
+# How ill tell clip that a match is bad using Triplet loss
+Once I have three images, I'll put all of them through the **same CLIP image encoder**. They need to share weights so their embeddings are directly comparable.
+
+The embeddings are going to be: (Where *a* = Anchor, *p* = positive, *n* = negative)
+
+$$
+a=f_{\theta}(A),\qquad p=f_{\theta}(P),\qquad n=f_{\theta}(N)
+$$
+
+I want the anchor to be closer to the positive than to the negative, with some extra separation called a margin, which will help the training go along faster at the rate of how large m is going to be:
+
+$$
+d(a,p)+m\le d(a,n)
+$$
+
+Triplet Loss measures how much the model violates that goal:
+
+$$
+L=\max\big(0,d(a,p)-d(a,n)+m\big)
+$$
+
+Lets say that the correct item's distance is 0.70, the wrong item's distance is 0.40, and I use a margin of 0.20. Then the loss would be:
+
+$$
+L=\max(0,0.70-0.40+0.20)=0.50
+$$
+
+In this case the wrong item is closer, and the goal would be to reduce it.
