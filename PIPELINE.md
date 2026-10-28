@@ -272,8 +272,9 @@ where $I$ is an image and $\mathbf{e}\in\mathbb{R}^{512}$ is its embedding. The 
 For the ViT-B/32 image encoder (means Viual Transformer), the image is preprocessed and split into patches (32 by 32 pixels at the usual 224 by 224 input size). Patches are projected into tokens, processed by transformer blocks, and mapped into CLIP's shared embedding space. One key transformer operation is scaled dot-product attention:
 
 $$
-\operatorname{Attention}(Q,K,V)
-=\operatorname{softmax}\!\left(\frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V.
+\mathrm{Attention}(Q,K,V)
+=
+\mathrm{softmax}\left(\frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V
 $$
 
 Tensors in pyTorch: A tensor is basically a collection of numbers with a shape. A scalar has no axes, a vector has one, and a matrix has two. Image batches usually have more. For a batch of 32 RGB images, the CLIP-ready tensor commonly has shape:
@@ -354,7 +355,9 @@ $$
 Across all evaluated queries:
 
 $$
-\operatorname{Recall@K}=\frac{1}{N}\sum_{i=1}^{N}h_K(q_i)
+\mathrm{Recall@K}
+=
+\frac{1}{N}\sum_{i=1}^{N}h_K(q_i)
 $$
 
 # How ill tell clip that a match is bad using Triplet loss
