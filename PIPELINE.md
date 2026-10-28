@@ -248,3 +248,30 @@ instead of having no clue where it came from.
 i tested it with fake grayscale, transparent, and normal images and they all
 came out as RGB like theyre supposed to. this still isnt the training loop yet,
 its just the bridge between the triplet json and whatever model i train next.
+
+October 27
+Research on how the math behind weights and the clip model itself works:
+The project uses pretrained openai/clip-vit-base-patch32, a CLIP model with a Vision Transformer image encoder. Its image embeddings have 512 dimensions.
+
+A trainable weight is a numerical parameter used in a computation. A simple linear layer is:
+
+$$
+\mathbf{y}=W\mathbf{x}+\mathbf{b},
+$$
+
+where x is an input vector, W is a weight matrix, b is a bias vector, and y is the output vector. In a layer with 768 inputs and 512 outputs, the weight matrix has 512 x 768 = 393,216 entries plus 512 biases. The actual CLIP model contains many interacting layers and parameters; no single parameter can generally be labeled as the colour weight or the logo weight.
+
+A neural-network model is a function parameterized by weights $\theta$:
+
+$$
+\mathbf{e}=f_{\theta}(I),
+$$
+
+where $I$ is an image and $\mathbf{e}\in\mathbb{R}^{512}$ is its embedding. The weights $\theta$ determine how visual input turns into a vector.
+
+For the ViT-B/32 image encoder, the image is preprocessed and split into patches (32 by 32 pixels at the usual 224 by 224 input size). Patches are projected into tokens, processed by transformer blocks, and mapped into CLIP's shared embedding space. One key transformer operation is scaled dot-product attention:
+
+$$
+\operatorname{Attention}(Q,K,V)
+=\operatorname{softmax}\!\left(\frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V.
+$$
