@@ -272,9 +272,8 @@ where $I$ is an image and $\mathbf{e}\in\mathbb{R}^{512}$ is its embedding. The 
 For the ViT-B/32 image encoder (means Viual Transformer), the image is preprocessed and split into patches (32 by 32 pixels at the usual 224 by 224 input size). Patches are projected into tokens, processed by transformer blocks, and mapped into CLIP's shared embedding space. One key transformer operation is scaled dot-product attention:
 
 $$
-\operatorname{Attention}(Q,K,V)
-=
-\operatorname{softmax}\left(\frac{QK^{\mathsf T}}{\sqrt{d_k}}\right)V
+\mathrm{Attention}(Q,K,V) =
+\mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 $$
 
 Tensors in pyTorch: A tensor is basically a collection of numbers with a shape. A scalar has no axes, a vector has one, and a matrix has two. Image batches usually have more. For a batch of 32 RGB images, the CLIP-ready tensor commonly has shape:
@@ -315,14 +314,12 @@ normalized = F.normalize(features, p=2, dim=-1)
 
 Finally, to compare multiple normalized embeddings, PyTorch compares the distance (angle) of the two vectors using. cosine similarity using this function:
 $$
-\operatorname{sim}(\mathbf a,\mathbf b)=
-\frac{\mathbf a\cdot\mathbf b}{\lVert\mathbf a\rVert_2\lVert\mathbf b\rVert_2}
+\mathrm{sim}(\mathbf{a},\mathbf{b}) =
+\frac{\mathbf{a}\cdot\mathbf{b}}
+{\|\mathbf{a}\|_2\|\mathbf{b}\|_2}
 $$
-This function already accounts for length, but normalizing the vectors make the calculation faster during comparisons and would turn it into a simple dot product: 
-$$
-\operatorname{sim}(\hat{\mathbf a},\hat{\mathbf b})=
-\hat{\mathbf a}^{T}\hat{\mathbf b}
-$$
+
+This function already accounts for length, but normalizing the vectors make the calculation faster during comparisons and would turn it into a simple dot product.
 For an entire gallery, I can calculate all the query-to-gallery scores at once:
 $$
 \mathbf s=G\mathbf q
@@ -340,23 +337,28 @@ DeepFashion2 supplies the answer through its labels. In the evaluation I've desc
 
 I can define the correct shop matches for a query as:
 $$
-M(q)=\{g:\operatorname{pair\_id}(g)=\operatorname{pair\_id}(q)
-\ \land\ \operatorname{style}(g)=\operatorname{style}(q)\}
+M(q)=
+\left\{
+g \mid
+\mathrm{pair\_id}(g)=\mathrm{pair\_id}(q)
+\land
+\mathrm{style}(g)=\mathrm{style}(q)
+\right\}
 $$
 Then I check whether at least one correct match is present in the first K results:
 
 $$
-h_K(q)=\begin{cases}
-1 & \text{if a correct match appears in the top K}\\
-0 & \text{otherwise}
+h_K(q)=
+\begin{cases}
+1, & \text{if a correct match is in the top K} \\
+0, & \text{otherwise}
 \end{cases}
 $$
 
 Across all evaluated queries:
 
 $$
-\operatorname{Recall}@K
-=
+\mathrm{Recall@K} =
 \frac{1}{N}\sum_{i=1}^{N}h_K(q_i)
 $$
 
