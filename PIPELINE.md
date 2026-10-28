@@ -313,17 +313,19 @@ normalized = F.normalize(features, p=2, dim=-1)
 # Cosine similarity
 
 Finally, to compare multiple normalized embeddings, PyTorch compares the distance (angle) of the two vectors using. cosine similarity using this function:
-$$
+
+```math
 \mathrm{sim}(\mathbf{a},\mathbf{b}) =
-\frac{\mathbf{a}\cdot\mathbf{b}}
-{\|\mathbf{a}\|_2\|\mathbf{b}\|_2}
-$$
+\frac{\mathbf{a}\cdot\mathbf{b}}{\lVert\mathbf{a}\rVert_2\lVert\mathbf{b}\rVert_2}
+```
 
 This function already accounts for length, but normalizing the vectors make the calculation faster during comparisons and would turn it into a simple dot product.
 For an entire gallery, I can calculate all the query-to-gallery scores at once:
-$$
-\mathbf s=G\mathbf q
-$$
+
+```math
+\mathbf{s}=G\mathbf{q}
+```
+
 Here `G` contains one normalized shop vector per row, `q` is the normalized query vector, and `s` contains a similarity score for every shop item.
 
 ```python
@@ -336,15 +338,15 @@ best_scores, best_indices = torch.topk(scores, k=5)
 DeepFashion2 supplies the answer through its labels. In the evaluation I've described, a query and shop garment match when their `pair_id` and `style` identify the same garment. The script compares the ranked results with those known labels.
 
 I can define the correct shop matches for a query as:
-$$
-M(q)=
-\left\{
-g \mid
+
+```math
+M(q)=\left\{g\mid
 \mathrm{pair\_id}(g)=\mathrm{pair\_id}(q)
 \land
 \mathrm{style}(g)=\mathrm{style}(q)
 \right\}
-$$
+```
+
 Then I check whether at least one correct match is present in the first K results:
 
 $$
