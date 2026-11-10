@@ -22,7 +22,18 @@ def parse_args():
     parser.add_argument(
         "--output",
         default="data/processed/deepfashion2_train_triplets.json",
-        help="Path for the generated triplet JSON file."
+        help="Path for the generated training triplet JSON file."
+    )
+    parser.add_argument(
+        "--tuning-output",
+        default="data/processed/deepfashion2_tuning_triplets.json",
+        help="Path for the generated tuning triplet JSON file."
+    )
+    parser.add_argument(
+        "--tuning-fraction",
+        type=float,
+        default=0.1,
+        help="Fraction of garment identities reserved for tuning (default: 0.1)."
     )
     parser.add_argument(
         "--seed",
@@ -33,12 +44,14 @@ def parse_args():
     parser.add_argument(
         "--limit",
         type=int,
-        help="Optional maximum number of triplets to create."
+        help="Optional maximum number of triplets to create in each split."
     )
 
     args = parser.parse_args()
     if args.limit is not None and args.limit < 0:
         parser.error("--limit cannot be negative.")
+    if not 0 < args.tuning_fraction < 1:
+        parser.error("--tuning-fraction must be between 0 and 1.")
 
     return args
 
@@ -80,6 +93,65 @@ def training_item(item: dict) -> dict:
         "source_category_id": item["source_category_id"],
         "source_category": item.get("source_category")
     }
+
+
+def split_metadata_by_identity(
+    metadata: list[dict],
+    tuning_fraction: float = 0.1,
+    seed: int = 42
+) -> tuple[list[dict], list[dict], dict[str, int]]:
+    """Split metadata without putting one garment identity on both sides."""
+    if not 0 < tuning_fraction < 1:
+        raise ValueError("tuning_fraction must be between 0 and 1.")
+
+    group_ids = sorted({
+        item["item_group_id"]
+        for item in metadata
+        if (
+            isinstance(item, dict)
+            and isinstance(item.get("item_group_id"), str)
+            and item["item_group_id"].strip()
+        )
+    })
+
+    if len(group_ids) < 2:
+        raise ValueError(
+            "At least two garment identities are required for a split."
+        )
+
+    random_generator = random.Random(seed)
+    random_generator.shuffle(group_ids)
+
+    tuning_group_count = round(len(group_ids) * tuning_fraction)
+    tuning_group_count = max(1, tuning_group_count)
+    tuning_group_count = min(len(group_ids) - 1, tuning_group_count)
+
+    tuning_group_ids = set(group_ids[:tuning_group_count])
+    training_group_ids = set(group_ids[tuning_group_count:])
+    training_metadata = []
+    tuning_metadata = []
+    records_without_identity = 0
+
+    for item in metadata:
+        if not isinstance(item, dict):
+            records_without_identity += 1
+            continue
+
+        group_id = item.get("item_group_id")
+        if group_id in training_group_ids:
+            training_metadata.append(item)
+        elif group_id in tuning_group_ids:
+            tuning_metadata.append(item)
+        else:
+            records_without_identity += 1
+
+    summary = {
+        "identity_groups": len(group_ids),
+        "training_identity_groups": len(training_group_ids),
+        "tuning_identity_groups": len(tuning_group_ids),
+        "records_without_identity": records_without_identity
+    }
+    return training_metadata, tuning_metadata, summary
 
 
 def build_training_triplets(
@@ -232,7 +304,8 @@ def build_training_triplets(
 def main() -> int:
     args = parse_args()
     metadata_path = resolve_from_project(args.metadata)
-    output_path = resolve_from_project(args.output)
+    training_output_path = resolve_from_project(args.output)
+    tuning_output_path = resolve_from_project(args.tuning_output)
 
     try:
         metadata = load_metadata(metadata_path)
@@ -240,34 +313,63 @@ def main() -> int:
         print(f"Could not load training metadata: {error}")
         return 1
 
-    triplets, summary = build_training_triplets(
-        metadata=metadata,
+    try:
+        training_metadata, tuning_metadata, split_summary = (
+            split_metadata_by_identity(
+                metadata=metadata,
+                tuning_fraction=args.tuning_fraction,
+                seed=args.seed
+            )
+        )
+    except ValueError as error:
+        print(f"Could not split training metadata: {error}")
+        return 1
+
+    training_triplets, training_summary = build_training_triplets(
+        metadata=training_metadata,
         seed=args.seed,
         limit=args.limit
     )
+    tuning_triplets, tuning_summary = build_training_triplets(
+        metadata=tuning_metadata,
+        seed=args.seed + 1,
+        limit=args.limit
+    )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as file:
-        json.dump(triplets, file, indent=2)
+    training_output_path.parent.mkdir(parents=True, exist_ok=True)
+    tuning_output_path.parent.mkdir(parents=True, exist_ok=True)
+    with training_output_path.open("w", encoding="utf-8") as file:
+        json.dump(training_triplets, file, indent=2)
+        file.write("\n")
+    with tuning_output_path.open("w", encoding="utf-8") as file:
+        json.dump(tuning_triplets, file, indent=2)
         file.write("\n")
 
-    print("Training triplet preparation complete.")
-    print(f"Metadata records: {summary['metadata_records']}")
-    print(f"Invalid records skipped: {summary['invalid_records']}")
-    print(f"User anchors checked: {summary['anchors_checked']}")
+    print("Identity-safe triplet preparation complete.")
+    print(f"Metadata records: {len(metadata)}")
+    print(f"Identity groups: {split_summary['identity_groups']}")
     print(
-        "Anchors without a shop positive: "
-        f"{summary['anchors_without_positive']}"
+        "Training identity groups: "
+        f"{split_summary['training_identity_groups']}"
     )
     print(
-        "Anchors without a same-category negative: "
-        f"{summary['anchors_without_negative']}"
+        "Tuning identity groups: "
+        f"{split_summary['tuning_identity_groups']}"
     )
-    print(f"Triplets created: {summary['triplets_created']}")
-    print(f"Triplets written to: {output_path}")
+    print(
+        "Records without an identity skipped: "
+        f"{split_summary['records_without_identity']}"
+    )
+    print(f"Training triplets: {training_summary['triplets_created']}")
+    print(f"Tuning triplets: {tuning_summary['triplets_created']}")
+    print(f"Training triplets written to: {training_output_path}")
+    print(f"Tuning triplets written to: {tuning_output_path}")
 
-    if not triplets:
-        print("No usable triplets were found.")
+    if not training_triplets or not tuning_triplets:
+        print(
+            "Both splits need usable triplets. Try more metadata or a "
+            "different split seed."
+        )
         return 1
 
     return 0

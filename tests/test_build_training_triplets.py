@@ -1,6 +1,9 @@
 import unittest
 
-from scripts.build_training_triplets import build_training_triplets
+from scripts.build_training_triplets import (
+    build_training_triplets,
+    split_metadata_by_identity
+)
 
 
 def metadata_item(
@@ -74,6 +77,96 @@ class BuildTrainingTripletsTests(unittest.TestCase):
 
         self.assertEqual(len(triplets), 1)
         self.assertEqual(summary["triplets_created"], 1)
+
+    def test_identity_split_has_no_garment_overlap(self):
+        metadata = []
+        for index in range(20):
+            group_id = f"garment-{index:02d}"
+            metadata.extend([
+                metadata_item(f"user-{index}", group_id, "user", 1),
+                metadata_item(f"shop-{index}", group_id, "shop", 1)
+            ])
+
+        training_metadata, tuning_metadata, summary = (
+            split_metadata_by_identity(
+                metadata,
+                tuning_fraction=0.2,
+                seed=42
+            )
+        )
+
+        training_groups = {
+            item["item_group_id"]
+            for item in training_metadata
+        }
+        tuning_groups = {
+            item["item_group_id"]
+            for item in tuning_metadata
+        }
+
+        self.assertTrue(training_groups)
+        self.assertTrue(tuning_groups)
+        self.assertTrue(training_groups.isdisjoint(tuning_groups))
+        self.assertEqual(summary["training_identity_groups"], 16)
+        self.assertEqual(summary["tuning_identity_groups"], 4)
+
+        training_triplets, _ = build_training_triplets(
+            training_metadata,
+            seed=42
+        )
+        tuning_triplets, _ = build_training_triplets(
+            tuning_metadata,
+            seed=43
+        )
+
+        training_triplet_groups = {
+            item["item_group_id"]
+            for triplet in training_triplets
+            for item in (
+                triplet["anchor"],
+                triplet["positive"],
+                triplet["negative"]
+            )
+        }
+        tuning_triplet_groups = {
+            item["item_group_id"]
+            for triplet in tuning_triplets
+            for item in (
+                triplet["anchor"],
+                triplet["positive"],
+                triplet["negative"]
+            )
+        }
+
+        self.assertTrue(training_triplets)
+        self.assertTrue(tuning_triplets)
+        self.assertTrue(
+            training_triplet_groups.isdisjoint(tuning_triplet_groups)
+        )
+
+    def test_identity_split_is_repeatable(self):
+        first_training, first_tuning, _ = split_metadata_by_identity(
+            self.metadata,
+            tuning_fraction=0.34,
+            seed=7
+        )
+        second_training, second_tuning, _ = split_metadata_by_identity(
+            self.metadata,
+            tuning_fraction=0.34,
+            seed=7
+        )
+
+        self.assertEqual(first_training, second_training)
+        self.assertEqual(first_tuning, second_tuning)
+
+    def test_identity_split_requires_multiple_groups(self):
+        one_group = [
+            metadata_item("user-a", "garment-a", "user", 1),
+            metadata_item("shop-a", "garment-a", "shop", 1)
+        ]
+
+        with self.assertRaisesRegex(ValueError, "two garment identities"):
+            split_metadata_by_identity(one_group)
 
 
 if __name__ == "__main__":

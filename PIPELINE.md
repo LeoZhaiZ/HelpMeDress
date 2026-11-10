@@ -224,7 +224,7 @@ general-purpose CLIP still has trouble recognizing the exact same garment.
 This is all i have done for now :salute: its gna be updated the more i work on it. also i think training stats are going to be put here too
 
 
-September 30
+# September 30
 i added the script that builds the training triplets before downloading
 train.zip. it takes a user pic, finds the matching shop pic, then finds a
 different shop item from the same clothing category to use as the negative. i
@@ -238,7 +238,7 @@ training loop uses them.
 
 
 
-October 4
+# October 4
 i added the pytorch dataset loader for the triplets. basically the json file
 tells it which 3 image paths belong together, then the loader actually opens
 the anchor, positive, and negative and turns all of them into RGB. i made it
@@ -249,7 +249,7 @@ i tested it with fake grayscale, transparent, and normal images and they all
 came out as RGB like theyre supposed to. this still isnt the training loop yet,
 its just the bridge between the triplet json and whatever model i train next.
 
-October 27
+# October 27
 Research on how the math behind weights and the clip model itself works:
 The project uses pretrained openai/clip-vit-base-patch32, a CLIP model with a Vision Transformer image encoder. Its image embeddings have 512 dimensions.
 
@@ -392,3 +392,15 @@ L=\max(0,0.70-0.40+0.20)=0.50
 $$
 
 In this case the wrong item is closer, and the goal would be to reduce it.
+
+
+# November 10
+i updated the triplet builder so the training and tuning data dont share the
+same garment ids. it now picks the garment groups first and keeps each whole
+group on only one side, then it chooses the positive and negative images from
+inside that side. this matters because seeing the same actual clothing item in
+both files would make the tuning results look way better than they really are.
+
+the default split is 90 percent training and 10 percent tuning and it writes
+both json files separately. i also added tests that make sure none of the
+anchor, positive, or negative garment ids leak across the two files.
