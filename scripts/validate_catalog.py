@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.batch_ingest import to_qdrant_id 
+from src.qdrant_ids import to_qdrant_id
 
 
 REQUIRED_FIELDS = {
@@ -51,7 +51,8 @@ def parse_args():
 
 def validate_catalog_items(
     catalog_items: object,
-    project_root: Path
+    project_root: Path,
+    show_progress: bool = False
 ) -> tuple[dict[str, int], list[str]]:
     """Validate parsed catalog data and return summary counts and errors."""
     if not isinstance(catalog_items, list):
@@ -184,6 +185,12 @@ def validate_catalog_items(
         else:
             summary["valid_records"] += 1
 
+        if show_progress and (
+            index % 1000 == 0
+            or index == len(catalog_items)
+        ):
+            print(f"Progress: {index}/{len(catalog_items)} records checked")
+
     return summary, errors
 
 
@@ -203,7 +210,8 @@ def main() -> int:
 
     summary, errors = validate_catalog_items(
         catalog_items=catalog_items,
-        project_root=PROJECT_ROOT
+        project_root=PROJECT_ROOT,
+        show_progress=True
     )
 
     if errors:

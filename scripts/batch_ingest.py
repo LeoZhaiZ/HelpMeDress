@@ -4,7 +4,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid5
 
 from PIL import Image
 from qdrant_client.models import PointStruct
@@ -18,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config import EMBEDDING_SIZE  # noqa: E402
 from src.embed import EmbeddingService  # noqa: E402
+from src.qdrant_ids import to_qdrant_id  # noqa: E402
 from src.search import VectorSearchService  # noqa: E402
 
 
@@ -56,17 +56,6 @@ def parse_args():
         parser.error("--limit cannot be negative.")
 
     return args
-
-
-def to_qdrant_id(item_id: object) -> int | str:
-    """Convert a catalog ID into an integer or deterministic UUID string."""
-    if isinstance(item_id, int) and not isinstance(item_id, bool):
-        return item_id
-
-    if isinstance(item_id, str) and item_id.isdigit():
-        return int(item_id)
-
-    return str(uuid5(NAMESPACE_URL, f"helpmedress:{item_id}"))
 
 
 def load_metadata(metadata_path: Path) -> list[dict]:
