@@ -410,3 +410,19 @@ both files would make the tuning results look way better than they really are.
 the default split is 90 percent training and 10 percent tuning and it writes
 both json files separately. i also added tests that make sure none of the
 anchor, positive, or negative garment ids leak across the two files.
+
+# November 17
+i finally added the first actual training script. im starting really small
+with 64 training triplets and 32 tuning ones because the point right now is to
+make sure backprop actually works without destroying my macbook again. the big
+vit part of clip stays frozen and only its final visual projection gets
+updated. it checks tuning loss before and after, then saves just those changed
+projection weights so the checkpoint doesnt need to contain the whole model.
+
+the first run looked frozen before it even got to clip. it turned out some
+packages inside my old venv had the mac `dataless` flag because Documents was
+being synced by icloud. i made a python 3.11 venv outside Documents instead and
+the same imports started working normally. the 8 training and 4 tuning triplet
+test changed the projection weights and the tuning loss went from about .1464
+to .1433. thats way too small of a test to claim the model is better but it
+does prove the backprop and checkpoint pipeline actually runs.
