@@ -22,13 +22,25 @@ see [PIPELINE.md](PIPELINE.md).
 - Exact in-memory retrieval evaluation with Recall@1, Recall@5, Recall@10,
   per-query rankings, and nearest-neighbor grids
 - Optional category-filtered retrieval evaluation
+- Projection-only CLIP triplet-training smoke test with held-out tuning metrics
 
-## Important: This Is Not Training Yet
+## Training Status
 
 The project currently uses the pretrained
-`openai/clip-vit-base-patch32` model in inference mode. Preparing images,
-creating embeddings, and storing them in Qdrant do not update CLIP's weights.
-There is currently no fine-tuning or model-training command.
+`openai/clip-vit-base-patch32` model for the application. Preparing images,
+creating embeddings, and storing them in Qdrant still do not update CLIP's
+weights. `scripts/train_clip_triplet.py` is the first isolated training step:
+it freezes the ViT backbone, updates the visual projection with triplet loss,
+and saves a checkpoint. The application does not load that checkpoint yet.
+
+For a small training smoke test using the identity-separated manifests:
+
+```bash
+python scripts/train_clip_triplet.py
+```
+
+The default run uses 64 training triplets and 32 tuning triplets. Increase
+`--train-limit` and `--tuning-limit` only after this small run succeeds.
 
 ## Quick Start
 
@@ -40,6 +52,16 @@ If the virtual environment already exists:
 
 ```bash
 source venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+If the project is inside an iCloud-synced Documents folder, keep the virtual
+environment outside that folder. iCloud can evict package files and leave
+`dataless` placeholders, which makes imports appear frozen. One option is:
+
+```bash
+python3.11 -m venv ~/.venvs/HelpMeDress
+source ~/.venvs/HelpMeDress/bin/activate
 python -m pip install -r requirements.txt
 ```
 
