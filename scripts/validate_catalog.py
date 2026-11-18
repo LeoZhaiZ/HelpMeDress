@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -46,20 +47,64 @@ def parse_args():
         default="data/processed/catalog_metadata.json",
         help="Path to the catalog metadata JSON file."
     )
-    return parser.parse_args()
+    image_check_group = parser.add_mutually_exclusive_group()
+    image_check_group.add_argument(
+        "--image-check-limit",
+        type=int,
+        default=1000,
+        help=(
+            "Maximum number of randomly sampled images to fully open "
+            "(default: 1000)."
+        )
+    )
+    image_check_group.add_argument(
+        "--check-all-images",
+        action="store_true",
+        help="Fully open every image instead of checking a sample."
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed used to choose the image sample (default: 42)."
+    )
+
+    args = parser.parse_args()
+    if args.image_check_limit is not None and args.image_check_limit < 0:
+        parser.error("--image-check-limit cannot be negative.")
+    return args
+
+
+def choose_image_check_indexes(
+    record_count: int,
+    image_check_limit: int | None,
+    seed: int
+) -> set[int]:
+    """Choose repeatable zero-based record indexes for image decoding."""
+    if image_check_limit is None or image_check_limit >= record_count:
+        return set(range(record_count))
+    if image_check_limit <= 0:
+        return set()
+
+    random_generator = random.Random(seed)
+    return set(random_generator.sample(range(record_count), image_check_limit))
 
 
 def validate_catalog_items(
     catalog_items: object,
     project_root: Path,
-    show_progress: bool = False
+    show_progress: bool = False,
+    image_check_limit: int | None = None,
+    image_check_seed: int = 42
 ) -> tuple[dict[str, int], list[str]]:
-    """Validate parsed catalog data and return summary counts and errors."""
+    """Validate all metadata and fully open a selected image sample."""
     if not isinstance(catalog_items, list):
         return {
             "records_checked": 0,
             "valid_records": 0,
             "invalid_records": 0,
+            "image_records_selected": 0,
+            "image_records_checked": 0,
             "missing_images": 0,
             "broken_images": 0,
             "duplicate_ids": 0,
@@ -70,6 +115,8 @@ def validate_catalog_items(
         "records_checked": len(catalog_items),
         "valid_records": 0,
         "invalid_records": 0,
+        "image_records_selected": 0,
+        "image_records_checked": 0,
         "missing_images": 0,
         "broken_images": 0,
         "duplicate_ids": 0,
@@ -78,9 +125,20 @@ def validate_catalog_items(
     errors = []
     seen_source_ids = {}
     seen_qdrant_ids = {}
+    image_check_indexes = choose_image_check_indexes(
+        record_count=len(catalog_items),
+        image_check_limit=image_check_limit,
+        seed=image_check_seed
+    )
+    summary["image_records_selected"] = len(image_check_indexes)
 
-    for index, item in enumerate(catalog_items, start=1):
+    for zero_based_index, item in enumerate(catalog_items):
+        index = zero_based_index + 1
         item_errors = []
+        check_image = zero_based_index in image_check_indexes
+
+        if check_image:
+            summary["image_records_checked"] += 1
 
         if not isinstance(item, dict):
             item_errors.append("record must be a JSON object")
@@ -156,7 +214,7 @@ def validate_catalog_items(
                 or not image_path_value.strip()
             ):
                 item_errors.append("image_path must be a non-empty string")
-            else:
+            elif check_image:
                 image_path = Path(image_path_value)
                 if not image_path.is_absolute():
                     image_path = project_root / image_path
@@ -186,10 +244,15 @@ def validate_catalog_items(
             summary["valid_records"] += 1
 
         if show_progress and (
-            index % 1000 == 0
+            index % 10000 == 0
             or index == len(catalog_items)
         ):
-            print(f"Progress: {index}/{len(catalog_items)} records checked")
+            print(
+                f"Progress: {index}/{len(catalog_items)} metadata records; "
+                f"{summary['image_records_checked']}/"
+                f"{summary['image_records_selected']} sampled images checked",
+                flush=True
+            )
 
     return summary, errors
 
@@ -201,6 +264,7 @@ def main() -> int:
     if not metadata_path.is_absolute():
         metadata_path = PROJECT_ROOT / metadata_path
 
+    print(f"Loading metadata: {metadata_path}", flush=True)
     try:
         with metadata_path.open("r", encoding="utf-8") as file:
             catalog_items = json.load(file)
@@ -208,10 +272,30 @@ def main() -> int:
         print(f"Could not read metadata: {error}")
         return 1
 
+    if not isinstance(catalog_items, list):
+        image_check_limit = None
+    elif args.check_all_images:
+        image_check_limit = None
+        print(
+            f"Loaded {len(catalog_items)} records. Every image will be "
+            "fully checked.",
+            flush=True
+        )
+    else:
+        image_check_limit = args.image_check_limit
+        sample_size = min(image_check_limit, len(catalog_items))
+        print(
+            f"Loaded {len(catalog_items)} records. All metadata will be "
+            f"checked; {sample_size} images will be fully opened.",
+            flush=True
+        )
+
     summary, errors = validate_catalog_items(
         catalog_items=catalog_items,
         project_root=PROJECT_ROOT,
-        show_progress=True
+        show_progress=True,
+        image_check_limit=image_check_limit,
+        image_check_seed=args.seed
     )
 
     if errors:
@@ -224,6 +308,11 @@ def main() -> int:
     print(f"Records checked: {summary['records_checked']}")
     print(f"Valid records: {summary['valid_records']}")
     print(f"Invalid records: {summary['invalid_records']}")
+    print(
+        "Images fully checked: "
+        f"{summary['image_records_checked']}/"
+        f"{summary['image_records_selected']}"
+    )
     print(f"Missing images: {summary['missing_images']}")
     print(f"Broken images: {summary['broken_images']}")
     print(f"Duplicate IDs: {summary['duplicate_ids']}")

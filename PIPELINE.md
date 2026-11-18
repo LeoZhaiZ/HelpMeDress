@@ -89,6 +89,12 @@ python scripts/validate_catalog.py \
   --metadata data/processed/deepfashion2_validation_shop_metadata.json
 ```
 
+for the really large train metadata i changed this so it still checks every
+record and id, but only fully opens a repeatable sample of 1000 images by
+default. opening all 312k crops one at a time was taking around two days on my
+machine and wasnt useful for a normal check. i can still use
+`--check-all-images` if i actually want the exhaustive version.
+
 This catches missing fields, missing or broken images, unsupported categories,
 duplicate IDs, and Qdrant ID collisions. I added it so i can catch the issue in the beginning
 

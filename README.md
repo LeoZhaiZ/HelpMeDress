@@ -66,6 +66,11 @@ python scripts/validate_catalog.py \
   --metadata data/processed/deepfashion2_validation_shop_metadata.json
 ```
 
+The validator checks every metadata record and fully opens a repeatable random
+sample of up to 1,000 images by default. This keeps large DeepFashion2 runs
+practical. Use `--image-check-limit 5000` for a larger sample, or
+`--check-all-images` only when an exhaustive image check is worth the time.
+
 ### 4. Ingest the catalog
 
 For a five-item smoke test that rebuilds the Qdrant collection:
