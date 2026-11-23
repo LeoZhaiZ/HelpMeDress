@@ -31,7 +31,8 @@ The project currently uses the pretrained
 creating embeddings, and storing them in Qdrant still do not update CLIP's
 weights. `scripts/train_clip_triplet.py` is the first isolated training step:
 it freezes the ViT backbone, updates the visual projection with triplet loss,
-and saves a checkpoint. The application does not load that checkpoint yet.
+and saves a checkpoint. The retrieval evaluator can load that checkpoint for
+baseline comparisons, but the FastAPI/Qdrant application does not use it yet.
 
 For a small training smoke test using the identity-separated manifests:
 
@@ -41,6 +42,18 @@ python scripts/train_clip_triplet.py
 
 The default run uses 64 training triplets and 32 tuning triplets. Increase
 `--train-limit` and `--tuning-limit` only after this small run succeeds.
+
+To compare a saved projection against the pretrained CLIP baseline on the same
+retrieval subset:
+
+```bash
+python scripts/evaluate_retrieval.py \
+  --category-filter \
+  --checkpoint data/processed/checkpoints/clip_triplet_smoke.pt
+```
+
+Checkpoint runs write to separate `_trained` result and grid paths by default,
+so the original baseline measurements are not overwritten.
 
 ## Quick Start
 
@@ -172,14 +185,19 @@ results for that subset, not claims about the complete dataset:
 | --- | ---: | ---: | ---: |
 | CLIP, all garment categories | 17% | 28% | 39% |
 | CLIP, same detailed DeepFashion2 category only | 26% | 62% | 79% |
+| Projection smoke checkpoint, same category | 27% | 62% | 81% |
+
+The projection checkpoint row comes from only 64 training triplets and 32
+tuning triplets. It is an end-to-end smoke result, not evidence that the model
+will generalize at full scale.
 
 See [PIPELINE.md](PIPELINE.md) for the dataset layout, evaluation commands,
 output files, and an explanation of what these numbers mean.
 
 ## Remaining Work
 
-- Fine-tune a fashion-specific embedding model and compare it with the CLIP
-  baseline
+- Scale the fashion projection training beyond the smoke subset and compare it
+  repeatedly against the CLIP baseline
 - Improve exact-item matching and reduce background/person interference
 - Add garment segmentation
 - Evaluate on larger query and gallery subsets
