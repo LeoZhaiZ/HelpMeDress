@@ -467,3 +467,52 @@ $$
 this setup is basically transfer learning. clip already knows a lot about
 images, and im only changing how its existing features get mixed together into
 the final fashion embedding.
+
+
+for every triplet the same frozen vision model and the same projection matrix
+have to process all three images:
+
+$$
+\mathbf{a}=f_W(A),\qquad
+\mathbf{p}=f_W(P),\qquad
+\mathbf{n}=f_W(N)
+$$
+
+
+before backprop i clear the gradients from the previous batch:
+
+```python
+optimizer.zero_grad(set_to_none=True)
+```
+
+this matters because pytorch adds gradients together by default. after the
+forward pass calculates the loss, this is the line that starts
+backpropagation:
+
+```python
+loss.backward()
+```
+
+pytorch remembered the operations from the forward pass. backprop follows
+them in reverse and uses the chain rule to calculate how much every trainable
+weight contributed to the loss. for one projection weight $W_{ij}$, the value
+it calculates is:
+
+$$
+\frac{\partial L}{\partial W_{ij}}
+$$
+
+the full chain from the loss back to the projection can be written like:
+
+$$
+\frac{\partial L}{\partial W}
+=
+\frac{\partial L}{\partial d}
+\frac{\partial d}{\partial\mathbf{e}}
+\frac{\partial\mathbf{e}}{\partial\mathbf{z}}
+\frac{\partial\mathbf{z}}{\partial W}
+$$
+
+a positive gradient means increasing that weight would increase the loss. a
+negative gradient means increasing it would decrease the loss. a gradient near
+zero means that weight barely affected the current batch.
