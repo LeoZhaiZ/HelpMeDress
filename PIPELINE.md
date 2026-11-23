@@ -641,3 +641,30 @@ that proves backprop actually changed the weights, but 64 training triplets and
 is more accurate. i still need to load this checkpoint into the evaluator and
 compare Recall@K against the original pretrained clip model on the same held
 out validation queries.
+
+# November 22 - checking Recall@K with the trained checkpoint
+i updated the retrieval evaluator so it can load the saved projection instead
+of always using the original clip projection. it checks that the checkpoint
+was made from the same clip model and that the weight shape matches before it
+replaces anything. trained runs also get their own output names so i dont
+accidentally overwrite the baseline json.
+
+i ran the same category-filtered evaluation with 100 queries and the same 1000
+gallery items. the comparison came out as:
+
+```text
+                         Recall@1   Recall@5   Recall@10
+pretrained clip             26%        62%         79%
+trained projection          27%        62%         81%
+```
+
+19 queries moved to a better correct rank, 21 moved to a worse rank, and 60
+didnt change. the trained checkpoint crossed the useful cutoffs often enough
+to gain 1 point at Recall@1 and 2 points at Recall@10, but it didnt improve
+every query and Recall@5 stayed the same.
+
+this is a nice sign that the full training and evaluation connection works,
+especially because i only trained on 64 triplets, but its still way too small
+to call the model improved in general. the next useful experiment is to train
+on a bigger repeatable subset and see whether the held-out Recall@K improvement
+gets larger and stays consistent instead of disappearing.
