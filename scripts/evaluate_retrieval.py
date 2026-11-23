@@ -1,4 +1,4 @@
-"""Evaluate zero-shot CLIP retrieval on DeepFashion2 query/gallery pairs."""
+"""Evaluate pretrained or projection-trained CLIP retrieval."""
 
 import argparse
 import json
@@ -21,7 +21,7 @@ from src.embed import EmbeddingService
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Measure zero-shot CLIP retrieval on DeepFashion2."
+        description="Measure CLIP retrieval on DeepFashion2."
     )
     parser.add_argument(
         "--dataset-root",
@@ -55,6 +55,12 @@ def parse_args():
         "--category-filter",
         action="store_true",
         help="Compare each query only with gallery items in its category."
+    )
+    parser.add_argument(
+        "--checkpoint",
+        help=(
+            "Optional projection checkpoint made by train_clip_triplet.py."
+        )
     )
     parser.add_argument(
         "--output",
@@ -516,7 +522,14 @@ def main() -> int:
     args = parse_args()
     dataset_root = resolve_from_project(args.dataset_root)
     evaluation_dir = resolve_from_project(args.evaluation_dir)
-    result_suffix = "_category_filtered" if args.category_filter else ""
+    checkpoint_path = (
+        resolve_from_project(args.checkpoint)
+        if args.checkpoint
+        else None
+    )
+    trained_suffix = "_trained" if checkpoint_path is not None else ""
+    category_suffix = "_category_filtered" if args.category_filter else ""
+    result_suffix = f"{trained_suffix}{category_suffix}"
     output_path = resolve_from_project(
         args.output
         or f"data/processed/retrieval_evaluation{result_suffix}.json"
@@ -547,7 +560,13 @@ def main() -> int:
     print(f"Selected queries: {len(selected_queries)}")
     print(f"Selected gallery items: {len(selected_gallery)}")
 
-    embedding_service = EmbeddingService()
+    try:
+        embedding_service = EmbeddingService(
+            checkpoint_path=checkpoint_path
+        )
+    except (FileNotFoundError, ValueError) as error:
+        print(f"Could not load embedding model: {error}")
+        return 1
     gallery_items, gallery_embeddings, skipped_gallery = embed_items(
         items=selected_gallery,
         image_id_field="gallery_image_id",
@@ -583,6 +602,10 @@ def main() -> int:
 
     results = {
         "model": CLIP_MODEL_NAME,
+        "checkpoint": (
+            str(checkpoint_path) if checkpoint_path is not None else None
+        ),
+        "checkpoint_metadata": embedding_service.checkpoint_metadata,
         "query_count": evaluated_query_count,
         "gallery_count": len(gallery_items),
         "skipped_queries": skipped_queries,
@@ -600,7 +623,14 @@ def main() -> int:
         json.dump(results, file, indent=2)
         file.write("\n")
 
-    print("\nZero-shot CLIP retrieval evaluation")
+    evaluation_label = (
+        "Projection-trained CLIP"
+        if checkpoint_path is not None
+        else "Pretrained CLIP"
+    )
+    print(f"\n{evaluation_label} retrieval evaluation")
+    if checkpoint_path is not None:
+        print(f"Checkpoint: {checkpoint_path}")
     print(f"Category filter: {'on' if args.category_filter else 'off'}")
     print(f"Queries evaluated: {evaluated_query_count}")
     print(f"Gallery items: {len(gallery_items)}")
