@@ -516,3 +516,128 @@ $$
 a positive gradient means increasing that weight would increase the loss. a
 negative gradient means increasing it would decrease the loss. a gradient near
 zero means that weight barely affected the current batch.
+
+
+the easiest version of a weight update would be normal gradient descent:
+
+$$
+W_{\mathrm{new}}
+=
+W_{\mathrm{old}}
+-
+\eta\frac{\partial L}{\partial W}
+$$
+
+$\eta$ is the learning rate, which is currently $0.0001$. the minus sign moves
+the weights in the direction that should lower the loss.
+
+the script actually uses AdamW, which keeps a moving average of the recent
+gradient direction and size. a simplified AdamW update is:
+
+$$
+W_{t+1}
+=
+W_t
+-
+\eta\frac{\hat{m}_t}{\sqrt{\hat{v}_t}+\epsilon}
+-
+\eta\lambda W_t
+$$
+
+$\hat{m}_t$ tracks the recent gradient direction, $\hat{v}_t$ tracks its
+size, $\epsilon$ prevents division by zero, and $\lambda$ is weight decay that
+helps stop the weights from becoming extreme. the actual update happens with:
+
+```python
+optimizer.step()
+```
+
+so one training batch basically does this:
+
+```text
+clear old gradients
+  -> send the images through clip
+  -> calculate the triplet loss
+  -> backpropagate the loss
+  -> let AdamW update the projection weights
+```
+
+my batch size is 4 triplets, but each triplet contains 3 images. that means
+clip actually sees:
+
+$$
+4\times3=12
+$$
+
+images in one forward pass. the smoke test used 64 training triplets, so one
+epoch contained:
+
+$$
+\frac{64}{4}=16
+$$
+
+batches and therefore 16 optimizer updates. an epoch just means one complete
+pass through every training triplet selected for that run.
+
+the tuning triplets are different garment identities that the optimizer is
+not allowed to learn from. the script calculates their loss before and after
+training, but it does not call `loss.backward()` or `optimizer.step()` on them.
+this tells me whether the update also helped on clothes the model did not train
+on instead of only memorizing the training examples.
+
+before the 64-triplet smoke training, the tuning distances were:
+
+$$
+d(\mathbf{a},\mathbf{p})=0.2665,\qquad
+d(\mathbf{a},\mathbf{n})=0.3174
+$$
+
+so the gap between the negative and positive was:
+
+$$
+0.3174-0.2665=0.0509
+$$
+
+after training, the distances were:
+
+$$
+d(\mathbf{a},\mathbf{p})=0.2934,\qquad
+d(\mathbf{a},\mathbf{n})=0.3528
+$$
+
+and the new gap was:
+
+$$
+0.3528-0.2934=0.0594
+$$
+
+both distances increased, but the negative distance increased more. that means
+the wrong garment moved farther away relative to the correct garment, which is
+why the tuning loss went from:
+
+$$
+0.1491\longrightarrow0.1420
+$$
+
+the percentage of tuning triplets still breaking the margin rule also went
+from:
+
+$$
+100\%\longrightarrow87.5\%
+$$
+
+finally i measured how far the complete projection matrix moved:
+
+$$
+\left\lVert
+W_{\mathrm{after}}-W_{\mathrm{before}}
+\right\rVert_2
+=
+0.305007
+$$
+
+that proves backprop actually changed the weights, but 64 training triplets and
+32 tuning triplets are still way too small to claim the whole retrieval system
+is more accurate. i still need to load this checkpoint into the evaluator and
+compare Recall@K against the original pretrained clip model on the same held
+out validation queries.
