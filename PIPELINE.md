@@ -426,3 +426,44 @@ the same imports started working normally. the 8 training and 4 tuning triplet
 test changed the projection weights and the tuning loss went from about .1464
 to .1433. thats way too small of a test to claim the model is better but it
 does prove the backprop and checkpoint pipeline actually runs.
+
+# November 22 - how the backprop math actually works
+i wanted to understand what the training script is actually changing instead
+of just saying that pytorch magically learns. im not training the entire clip
+model yet because that would be way more expensive. the big vision transformer
+is frozen and right now im only training its final visual projection.
+
+the frozen vision transformer turns an image into 768 numbers:
+
+$$
+\mathbf{h}=g_{\phi}(I)
+$$
+
+where $I$ is the image, $g$ is the vision transformer, $\phi$ represents its
+frozen weights, and $\mathbf{h}\in\mathbb{R}^{768}$ is the feature vector it
+produces. frozen means those $\phi$ weights are used in the forward pass but
+backprop is not allowed to change them.
+
+the trainable projection then turns the 768 features into the 512-number
+embedding that the rest of HelpMeDress uses:
+
+$$
+\mathbf{z}=W\mathbf{h}
+$$
+
+the actual projection has no bias and $W$ has shape $512\times768$, so the
+number of weights im changing is:
+
+$$
+512\times768=393{,}216
+$$
+
+after the projection i normalize the result so its length is one:
+
+$$
+\mathbf{e}=\frac{\mathbf{z}}{\lVert\mathbf{z}\rVert_2}
+$$
+
+this setup is basically transfer learning. clip already knows a lot about
+images, and im only changing how its existing features get mixed together into
+the final fashion embedding.
