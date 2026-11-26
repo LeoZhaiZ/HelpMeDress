@@ -668,3 +668,28 @@ especially because i only trained on 64 triplets, but its still way too small
 to call the model improved in general. the next useful experiment is to train
 on a bigger repeatable subset and see whether the held-out Recall@K improvement
 gets larger and stays consistent instead of disappearing.
+
+# November 24 - checking Recall@K after 1000 training triplets
+i started from pretrained clip again and trained the same projection for one
+epoch on 1000 triplets with seed 42. the batch size was still 4, so that came
+out to 250 updates. i used 200 separate tuning triplets this time and their
+loss went from 0.1460 to 0.0652.
+
+i reran the same 100 queries and 1000 shop items with the category filter on.
+here are the scores so far by how many triplets each checkpoint trained on:
+
+| Training triplets | Recall@1 | Recall@5 | Recall@10 |
+| ---: | ---: | ---: | ---: |
+| 0 (pretrained CLIP) | 26% | 62% | 79% |
+| 64 | 27% | 62% | 81% |
+| 1,000 | 58% | 86% | 95% |
+
+compared with the 64-triplet run, 31 more queries had the right item at rank
+one. the first correct match moved up for 60 queries, stayed put for 34,
+and moved down for 6. these scores are for this same validation subset, so
+ill check a bigger set of queries and shop items before drawing a wider
+conclusion.
+
+i saved the new weights in `data/processed/checkpoints/clip_triplet_1000.pt`
+and the rankings in
+`data/processed/retrieval_evaluation_trained_1000_category_filtered.json`.
